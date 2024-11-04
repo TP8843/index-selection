@@ -20,10 +20,37 @@ def generate_graph(df: pd.DataFrame, beta: float) -> rx.PyGraph:
     for i in range(num_indices):
         for j in range(i, num_indices):
             distance: int = np.count_nonzero(df.iloc[i] != df.iloc[j])
-            if distance >= min_distance:
+            if distance < min_distance:
                 graph.add_edge(i, j, distance)
 
     return graph
+
+def get_batches(df: pd.DataFrame, beta: float) -> rx.PyGraph:
+    graph = generate_graph(df, beta)
+
+
+    max_degree = -1
+    for v in graph.node_indexes():
+        if graph.degree(v) > max_degree:
+            max_degree = graph.degree(v)
+
+    batches = [[] for _ in range(max_degree + 1)]
+
+    for v in graph.node_indexes():
+        neighbours = graph.neighbors(v)
+        batch = 0
+
+        for b in range(len(batches)):
+            if not any(map(lambda i: i in neighbours, batches[b])):
+                if len(batches[b]) < len(batches[batch]):
+                    batch = b
+
+        batches[batch].append(v)
+
+    return batches
+
+
+
 
 def get_stable_set(df: pd.DataFrame, beta: float, selection_function: Callable[[pd.DataFrame, rx.PyGraph], int]) -> list[int]:
     working_graph = generate_graph(df, beta)
@@ -43,7 +70,7 @@ def get_stable_set(df: pd.DataFrame, beta: float, selection_function: Callable[[
 def minimum_degree_selection(df: pd.DataFrame, graph: rx.PyGraph) -> int:
     # Bigger than the largest possible degree
     min_degree: int = df.shape[0]
-    index: int
+    index: int = 0
 
     for i in graph.node_indexes():
         degree = graph.degree(i)
